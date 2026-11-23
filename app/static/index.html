@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ask your documents</title>
+<style>
+  :root { --bg: #fff; --ink: #16181d; --ink-2: #555b66; --rule: #e3e5e8; --accent: #2f6f3e; --bad: #b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111317; --ink: #eceef1; --ink-2: #9aa1ad; --rule: #2a2e35; --accent: #7cc48a; --bad: #f2a29c; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 32px 0 8px; }
+  p.sub, .muted { color: var(--ink-2); }
+  section { border-top: 1px solid var(--rule); }
+  textarea, input[type=password] { width: 100%; font: inherit; color: inherit; background: transparent;
+    border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; }
+  button { font: inherit; border: 1px solid var(--ink); background: var(--ink); color: var(--bg);
+    border-radius: 6px; padding: 7px 14px; cursor: pointer; }
+  button.quiet { background: transparent; color: var(--ink); border-color: var(--rule); padding: 2px 8px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+  .answer { white-space: pre-wrap; margin-top: 12px; }
+  .src { font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+  .bad { color: var(--bad); }
+  .ok { color: var(--accent); }
+  code { font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ask your documents</h1>
+  <p class="sub">Upload PDFs or text files, then ask questions. Answers come only from your documents, with sources.</p>
+  <p id="setup" class="muted"></p>
+
+  <section>
+    <h2>Ask</h2>
+    <textarea id="q" rows="3" placeholder="What is our refund policy?"></textarea>
+    <div class="row"><button id="ask">Ask</button><span id="askState" class="muted"></span></div>
+    <div id="answer" class="answer"></div>
+    <div id="sources"></div>
+  </section>
+
+  <section>
+    <h2>Documents</h2>
+    <div class="row">
+      <input id="file" type="file" accept=".pdf,.txt,.md,.markdown,.csv,.json,.html,.htm">
+      <button id="upload">Upload</button>
+    </div>
+    <div class="row"><input id="token" type="password" placeholder="Admin token (ADMIN_TOKEN), needed to upload or delete"></div>
+    <p id="upState" class="muted"></p>
+    <ul id="docs"></ul>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const store = { get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+                set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+$('token').value = store.get('rag-admin-token');
+$('token').addEventListener('change', () => store.set('rag-admin-token', $('token').value));
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.detail || `Request failed (${r.status})`);
+  return body;
+}
+const authHeader = () => ({ Authorization: `Bearer ${$('token').value}` });
+
+async function loadStatus() {
+  const s = await api('/api/status');
+  const missing = { database: 'wire a Postgres card', vectors: 'turn on Vectors on the Postgres card',
+                    ai_key: 'set OPENAI_API_KEY or wire an AI card', admin_token: 'set ADMIN_TOKEN to allow uploads' };
+  const todo = Object.entries(s.steps).filter(([, ok]) => !ok).map(([k]) => missing[k]);
+  $('setup').innerHTML = todo.length ? `<span class="bad">Still to set up:</span> ${todo.join('; ')}.`
+    : `<span class="ok">Ready.</span> Chat: <code>${s.models.chat}</code>, embeddings: <code>${s.models.embedding}</code>.`;
+}
+
+async function loadDocs() {
+  let docs = [];
+  try { docs = await api('/api/documents'); } catch (e) { $('docs').innerHTML = ''; return; }
+  $('docs').replaceChildren(...docs.map((d) => {
+    const li = document.createElement('li');
+    const left = document.createElement('span');
+    left.textContent = `${d.name} · ${d.status === 'ready' ? d.chunks + ' chunks' : d.status}${d.error ? ' · ' + d.error : ''}`;
+    if (d.status === 'failed') left.className = 'bad';
+    const del = document.createElement('button');
+    del.className = 'quiet'; del.textContent = 'Delete';
+    del.onclick = async () => { try { await api(`/api/documents/${d.id}`, { method: 'DELETE', headers: authHeader() }); loadDocs(); }
+                                catch (e) { $('upState').textContent = e.message; } };
+    li.append(left, del);
+    return li;
+  }));
+  if (docs.some((d) => d.status === 'processing')) setTimeout(loadDocs, 2000);
+}
+
+$('upload').onclick = async () => {
+  const f = $('file').files[0];
+  if (!f) { $('upState').textContent = 'Pick a file first.'; return; }
+  const form = new FormData(); form.append('file', f);
+  $('upload').disabled = true; $('upState').textContent = 'Uploading…';
+  try { await api('/api/documents', { method: 'POST', headers: authHeader(), body: form });
+        $('upState').textContent = 'Uploaded. Reading it now…'; loadDocs(); }
+  catch (e) { $('upState').textContent = e.message; }
+  finally { $('upload').disabled = false; }
+};
+
+$('ask').onclick = async () => {
+  const question = $('q').value.trim();
+  if (!question) return;
+  $('ask').disabled = true; $('askState').textContent = 'Thinking…'; $('answer').textContent = ''; $('sources').replaceChildren();
+  try {
+    const r = await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ question }) });
+    $('answer').textContent = r.answer;
+    $('sources').replaceChildren(...r.sources.map((s) => {
+      const div = document.createElement('div'); div.className = 'src';
+      div.textContent = `[${s.n}] ${s.document}, page ${s.page} (match ${Math.round(s.score * 100)}%)`;
+      return div;
+    }));
+    $('askState').textContent = '';
+  } catch (e) { $('askState').textContent = e.message; }
+  finally { $('ask').disabled = false; }
+};
+
+loadStatus().catch(() => {}); loadDocs();
+</script>
+</body>
+</html>
