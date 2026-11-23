@@ -175,6 +175,27 @@ def test_ai_errors_are_plain(client, monkeypatch):
     assert r.status_code == 502 and "401" in r.json()["detail"]
 
 
+def test_chat_sends_reasoning_settings_only_when_set(monkeypatch):
+    sent = []
+    reply = {"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}]}
+    monkeypatch.setattr(ai, "_post", lambda path, body: sent.append(body) or reply)
+    monkeypatch.setattr(config, "CHAT_MAX_TOKENS", 0)
+    monkeypatch.setattr(config, "REASONING_EFFORT", "")
+    assert ai.chat([]) == "ok"
+    assert "max_tokens" not in sent[-1] and "reasoning_effort" not in sent[-1]
+    monkeypatch.setattr(config, "CHAT_MAX_TOKENS", 2000)
+    monkeypatch.setattr(config, "REASONING_EFFORT", "low")
+    ai.chat([])
+    assert sent[-1]["max_tokens"] == 2000 and sent[-1]["reasoning_effort"] == "low"
+
+
+def test_an_empty_answer_is_an_error_that_says_why(monkeypatch):
+    monkeypatch.setattr(ai, "_post", lambda path, body: {"choices": [{"message": {"content": None},
+                                                                       "finish_reason": "length"}]})
+    with pytest.raises(ai.AIError, match="CHAT_MAX_TOKENS"):
+        ai.chat([])
+
+
 def test_embedding_size_is_checked(monkeypatch):
     monkeypatch.setattr(config, "AI_API_KEY", "k")
     monkeypatch.setattr(ai, "_post", lambda path, body: {"data": [{"index": 0, "embedding": [0.1] * 8}]})

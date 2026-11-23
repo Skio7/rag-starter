@@ -16,6 +16,10 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 AI_BASE_URL = (os.environ.get("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
 AI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 CHAT_MODEL = os.environ.get("CHAT_MODEL", "gpt-4o-mini")
+# Sent only when set (some providers reject them). Reasoning models (gpt-oss, o-series) need room to think
+# before they answer: e.g. CHAT_MAX_TOKENS=2000 and REASONING_EFFORT=low.
+CHAT_MAX_TOKENS = _int("CHAT_MAX_TOKENS", 0)
+REASONING_EFFORT = os.environ.get("REASONING_EFFORT", "").strip()
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
 # Must match the embedding model (text-embedding-3-small: 1536). Changing it later means re-uploading.
 EMBEDDING_DIM = _int("EMBEDDING_DIM", 1536)

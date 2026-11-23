@@ -24,6 +24,7 @@ The tables are created on first start. If something is missing, the page tells y
 | `OPENAI_API_KEY` | none | Key for the AI API |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Any OpenAI-compatible API |
 | `CHAT_MODEL` | `gpt-4o-mini` | Writes the answers |
+| `CHAT_MAX_TOKENS` / `REASONING_EFFORT` | not sent | For reasoning models (gpt-oss, o-series): e.g. `2000` / `low` |
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | Turns text into vectors |
 | `EMBEDDING_DIM` | `1536` | Size of the embedding model's vectors. Set it before the first upload |
 | `ADMIN_TOKEN` | none | Needed to upload and delete. Uploads are off without it |

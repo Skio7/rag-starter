@@ -41,5 +41,16 @@ def embed(texts: list[str]) -> list[list[float]]:
 
 
 def chat(messages: list[dict]) -> str:
-    reply = _post("/chat/completions", {"model": config.CHAT_MODEL, "messages": messages})
-    return (reply["choices"][0]["message"].get("content") or "").strip()
+    body = {"model": config.CHAT_MODEL, "messages": messages}
+    if config.CHAT_MAX_TOKENS:
+        body["max_tokens"] = config.CHAT_MAX_TOKENS
+    if config.REASONING_EFFORT:
+        body["reasoning_effort"] = config.REASONING_EFFORT
+    choice = _post("/chat/completions", body)["choices"][0]
+    answer = (choice.get("message", {}).get("content") or "").strip()
+    if not answer:
+        # reasoning models can spend the whole output allowance thinking and say nothing
+        hint = (" It ran out of room: raise CHAT_MAX_TOKENS (e.g. 2000) or set REASONING_EFFORT=low."
+                if choice.get("finish_reason") == "length" else " Try again.")
+        raise AIError("The AI model returned no answer." + hint)
+    return answer
