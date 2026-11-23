@@ -67,7 +67,8 @@ Scanned PDFs (images only) have no text to read: run OCR on them first.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest
+pytest                                                    # database tests are skipped
+RAG_TEST_DATABASE_URL=postgresql://... pytest             # also runs them (throwaway database with pgvector)
 DATABASE_URL=postgresql://... OPENAI_API_KEY=... ADMIN_TOKEN=dev uvicorn app.main:app --reload
 ```
 
