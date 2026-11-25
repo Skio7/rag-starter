@@ -37,6 +37,16 @@ def ensure_schema() -> None:
                 chunks integer NOT NULL DEFAULT 0,
                 created_at timestamptz NOT NULL DEFAULT now()
             )""")
+        # the embedding size: an existing table's, else EMBEDDING_DIM, else one test embedding
+        row = conn.execute("SELECT atttypmod FROM pg_attribute WHERE attrelid = to_regclass('chunks') "
+                           "AND attname = 'embedding'").fetchone()
+        if row:
+            if config.EMBEDDING_DIM and row[0] != config.EMBEDDING_DIM:
+                raise SetupNeeded(f"The chunks table holds {row[0]}-number embeddings but EMBEDDING_DIM is "
+                                  f"{config.EMBEDDING_DIM}. Set EMBEDDING_DIM back to {row[0]}.")
+            config.EMBEDDING_DIM = row[0]
+        elif not config.EMBEDDING_DIM:
+            config.EMBEDDING_DIM = _probe_dimensions()
         conn.execute(f"""
             CREATE TABLE IF NOT EXISTS chunks (
                 id bigserial PRIMARY KEY,
@@ -46,16 +56,19 @@ def ensure_schema() -> None:
                 content text NOT NULL,
                 embedding vector({config.EMBEDDING_DIM}) NOT NULL
             )""")
-        # an existing table made for another embedding size can't take these vectors
-        row = conn.execute("SELECT atttypmod FROM pg_attribute WHERE attrelid = 'chunks'::regclass "
-                           "AND attname = 'embedding'").fetchone()
-        if row and row[0] != config.EMBEDDING_DIM:
-            raise SetupNeeded(f"The chunks table holds {row[0]}-number embeddings but EMBEDDING_DIM is "
-                              f"{config.EMBEDDING_DIM}. Set EMBEDDING_DIM back to {row[0]}.")
         conn.execute("CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw ON chunks "
                      "USING hnsw (embedding vector_cosine_ops)")
         conn.execute("CREATE INDEX IF NOT EXISTS chunks_document ON chunks (document_id)")
     _ready = True
+
+
+def _probe_dimensions() -> int:
+    """How many numbers the embedding model returns: one tiny embedding."""
+    from app import ai
+    try:
+        return len(ai.embed(["dimension check"])[0])
+    except ai.AIError as e:
+        raise SetupNeeded(str(e))
 
 
 def vectors_on() -> bool:

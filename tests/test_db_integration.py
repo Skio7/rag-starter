@@ -61,6 +61,20 @@ def test_store_search_delete(database):
     assert db.delete_document(doc["id"]) is False
 
 
+def test_size_comes_from_one_test_embedding_then_from_the_table(database, monkeypatch):
+    from app import ai
+    _vectors_on()
+    calls = []
+    monkeypatch.setattr(config, "EMBEDDING_DIM", 0)
+    monkeypatch.setattr(ai, "embed", lambda texts: calls.append(texts) or [[0.1] * 5])
+    db.ensure_schema()
+    assert config.EMBEDDING_DIM == 5 and len(calls) == 1
+    monkeypatch.setattr(db, "_ready", False)
+    monkeypatch.setattr(config, "EMBEDDING_DIM", 0)
+    db.ensure_schema()  # the table now says 5: no second test embedding
+    assert config.EMBEDDING_DIM == 5 and len(calls) == 1
+
+
 def test_refuses_a_different_embedding_size(database, monkeypatch):
     _vectors_on()
     db.ensure_schema()

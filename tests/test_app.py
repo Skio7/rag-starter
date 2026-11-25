@@ -99,6 +99,7 @@ def client(monkeypatch):
     monkeypatch.setattr(config, "DATABASE_URL", "postgresql://x")
     monkeypatch.setattr(config, "AI_API_KEY", "sk-test")
     monkeypatch.setattr(config, "ADMIN_TOKEN", "admin-secret")
+    monkeypatch.setattr(config, "EMBEDDING_DIM", 768)
     asked = []
     monkeypatch.setattr(ai, "embed", lambda texts: [[0.0] * config.EMBEDDING_DIM for _ in texts])
     monkeypatch.setattr(ai, "chat", lambda messages: asked.append(messages) or "Within 7 days [1].")
@@ -198,6 +199,7 @@ def test_an_empty_answer_is_an_error_that_says_why(monkeypatch):
 
 def test_embedding_size_is_checked(monkeypatch):
     monkeypatch.setattr(config, "AI_API_KEY", "k")
+    monkeypatch.setattr(config, "EMBEDDING_DIM", 1536)
     monkeypatch.setattr(ai, "_post", lambda path, body: {"data": [{"index": 0, "embedding": [0.1] * 8}]})
     with pytest.raises(ai.AIError, match="EMBEDDING_DIM"):
         ai.embed(["hi"])

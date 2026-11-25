@@ -34,7 +34,7 @@ def embed(texts: list[str]) -> list[list[float]]:
         data = _post("/embeddings", {"model": config.EMBEDDING_MODEL, "input": texts[i:i + BATCH]})["data"]
         out.extend(item["embedding"] for item in sorted(data, key=lambda d: d["index"]))
     for vector in out:
-        if len(vector) != config.EMBEDDING_DIM:
+        if config.EMBEDDING_DIM and len(vector) != config.EMBEDDING_DIM:
             raise AIError(f"The embedding model returned {len(vector)} numbers, but EMBEDDING_DIM is "
                           f"{config.EMBEDDING_DIM}. Set EMBEDDING_DIM to {len(vector)} before uploading anything.")
     return out

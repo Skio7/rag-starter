@@ -6,13 +6,15 @@ source file and page. One small backend (FastAPI) and one Postgres database with
 ## Deploy on DeployKar
 
 1. Fork this repo (or click **New → RAG app** in DeployKar).
-2. On the canvas, add a **Postgres** card and turn on **Vectors**.
-3. Add a **Backend** card from your fork and draw a wire from the Postgres card to it. That sets
-   `DATABASE_URL`.
-4. In the backend's environment variables, set:
-   - `OPENAI_API_KEY`: your key for any OpenAI-compatible API.
-   - `ADMIN_TOKEN`: any long random text. You need it to upload or delete documents.
+2. On the canvas, add a **Postgres** card and turn on **Vectors**, and an **AI** card.
+3. Add a **Backend** card from your fork and draw a wire from each card to it. The Postgres wire sets
+   `DATABASE_URL`; the AI wire sets `OPENAI_BASE_URL` and `OPENAI_API_KEY`. No other AI account needed.
+4. In the backend's environment variables, set `ADMIN_TOKEN`: any long random text. You need it to upload or
+   delete documents.
 5. Deploy. Open the backend's address and upload a file.
+
+No AI card? Set `OPENAI_API_KEY` to your own key for any OpenAI-compatible API (and `OPENAI_BASE_URL` if it
+isn't OpenAI's).
 
 The tables are created on first start. If something is missing, the page tells you what to set up.
 
@@ -23,10 +25,10 @@ The tables are created on first start. If something is missing, the page tells y
 | `DATABASE_URL` | (from the wire) | Postgres with Vectors on |
 | `OPENAI_API_KEY` | none | Key for the AI API |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Any OpenAI-compatible API |
-| `CHAT_MODEL` | `gpt-4o-mini` | Writes the answers |
+| `CHAT_MODEL` | `default` with an AI card (the card's choice), else `gpt-4o-mini` | Writes the answers |
 | `CHAT_MAX_TOKENS` / `REASONING_EFFORT` | not sent | For reasoning models (gpt-oss, o-series): e.g. `2000` / `low` |
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | Turns text into vectors |
-| `EMBEDDING_DIM` | `1536` | Size of the embedding model's vectors. Set it before the first upload |
+| `EMBEDDING_MODEL` | `default` with an AI card, else `text-embedding-3-small` | Turns text into vectors |
+| `EMBEDDING_DIM` | worked out | Numbers per vector: from the existing table, else one test embedding. Changing the embedding model later means re-uploading |
 | `ADMIN_TOKEN` | none | Needed to upload and delete. Uploads are off without it |
 | `MAX_UPLOAD_MB` | `10` | Largest file |
 | `CHUNK_CHARS` / `CHUNK_OVERLAP` | `1200` / `200` | How documents are cut |

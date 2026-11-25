@@ -1,5 +1,6 @@
 """Settings, all from environment variables (DeployKar's canvas wires set most of them)."""
 import os
+from urllib.parse import urlparse
 
 
 def _int(name: str, default: int) -> int:
@@ -15,14 +16,17 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 # Any OpenAI-compatible API: OpenAI itself today, DeployKar AI once its card is wired (it sets both).
 AI_BASE_URL = (os.environ.get("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
 AI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-CHAT_MODEL = os.environ.get("CHAT_MODEL", "gpt-4o-mini")
+# A DeployKar AI card answers to "default": the models chosen on the card.
+USES_DEPLOYKAR_AI = (urlparse(AI_BASE_URL).hostname or "").endswith("deploykar.tech")
+CHAT_MODEL = os.environ.get("CHAT_MODEL") or ("default" if USES_DEPLOYKAR_AI else "gpt-4o-mini")
 # Sent only when set (some providers reject them). Reasoning models (gpt-oss, o-series) need room to think
 # before they answer: e.g. CHAT_MAX_TOKENS=2000 and REASONING_EFFORT=low.
 CHAT_MAX_TOKENS = _int("CHAT_MAX_TOKENS", 0)
 REASONING_EFFORT = os.environ.get("REASONING_EFFORT", "").strip()
-EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
-# Must match the embedding model (text-embedding-3-small: 1536). Changing it later means re-uploading.
-EMBEDDING_DIM = _int("EMBEDDING_DIM", 1536)
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL") or ("default" if USES_DEPLOYKAR_AI else "text-embedding-3-small")
+# Numbers per embedding. 0 (the default) = work it out: the existing table's size, else one test embedding.
+# Changing the embedding model later means re-uploading the documents.
+EMBEDDING_DIM = _int("EMBEDDING_DIM", 0)
 
 # Uploading and deleting documents needs this token; asking questions doesn't.
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
